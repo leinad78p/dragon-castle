@@ -17,16 +17,14 @@ jobs:
       - name: Download source
         uses: actions/checkout@v5
 
-      - name: Install GBA development libraries
+      - name: Verify devkitARM toolchain
         run: |
-          dkp-pacman -Sy --noconfirm gba-dev
-          echo "Checking for libgba header..."
-          ls -la "$DEVKITPRO/libgba/include/" || true
-          test -f "$DEVKITPRO/libgba/include/gba.h"
+          test -x "$DEVKITARM/bin/arm-none-eabi-gcc"
+          test -f "$DEVKITARM/gba_rules"
 
       - name: Compile game
         run: |
-          export PATH="$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH"
+          export PATH="$DEVKITARM/bin:$PATH"
           make
 
       - name: Upload GBA ROM
