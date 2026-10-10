@@ -68,7 +68,7 @@ static void landscape(void){
 static void title(void){landscape();}
 static void wait_vblank(void){while(REG_DISPSTAT&1){}while(!(REG_DISPSTAT&1)){}}
 static uint16_t keys(void){return (uint16_t)(~REG_KEYINPUT)&0x03ff;}
-static void title(void){clear(DARK);rect(12,12,216,136,BLUE);rect(16,16,208,128,BLACK);text(36,28,"DRAGON CASTLE",GOLD);text(36,56,"A TINY RPG",WHITE);rect(30,82,180,2,GOLD);text(24,98,"A START BEGIN",WHITE);text(24,122,"BATTLE A DRAGON",GREEN);}
+
 static void battle(int hp,int dr,int pot,int choice){clear(BLACK);text(24,8,"DRAGON BATTLE",GOLD);text(12,28,"HERO HP",WHITE);rect(108,28,100,10,GREY);rect(108,28,hp*100/34,10,GREEN);text(12,46,"DRAGON HP",WHITE);rect(108,46,100,10,GREY);rect(108,46,dr*100/46,10,RED);text(12,64,"POTIONS",WHITE);if(pot>0)rect(108,64,pot*20,8,BLUE);rect(12,82,216,64,DARK);text(24,88,choice==0?"> ATTACK":"  ATTACK",choice==0?GOLD:WHITE);text(24,108,choice==1?"> POTION":"  POTION",choice==1?GOLD:WHITE);text(24,128,choice==2?"> DEFEND":"  DEFEND",choice==2?GOLD:WHITE);}
 static void message(const char*t,const char*a,const char*b){clear(BLACK);text(24,28,t,GOLD);text(12,64,a,WHITE);text(12,84,b,WHITE);text(12,124,"A TO CONTINUE",GREEN);}
 int main(void){
