@@ -8,23 +8,29 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: devkitpro/devkitarm
+      image: devkitpro/devkitarm:latest
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITARM: /opt/devkitpro/devkitARM
 
     steps:
       - name: Download source
         uses: actions/checkout@v5
 
       - name: Install GBA development libraries
-        run: dkp-pacman -S --noconfirm gba-dev
+        run: |
+          dkp-pacman -Sy --noconfirm gba-dev
+          echo "Checking for libgba header..."
+          ls -la "$DEVKITPRO/libgba/include/" || true
+          test -f "$DEVKITPRO/libgba/include/gba.h"
 
       - name: Compile game
         run: |
-          export DEVKITPRO=/opt/devkitpro
-          export DEVKITARM=$DEVKITPRO/devkitARM
+          export PATH="$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH"
           make
 
       - name: Upload GBA ROM
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: dragoncastle-gba
           path: dragoncastle.gba
