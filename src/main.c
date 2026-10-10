@@ -41,11 +41,11 @@ static const Glyph *glyph(char c){unsigned i;if(c>='a'&&c<='z')c=(char)(c-'a'+'A
 static void text(int x,int y,const char*s,Color c){while(*s){const Glyph*g=glyph(*s++);int r,k;for(r=0;r<7;r++)for(k=0;k<5;k++)if(g->row[r]&(1u<<(4-k))){pixel(x+k*2,y+r*2,c);pixel(x+k*2+1,y+r*2,c);pixel(x+k*2,y+r*2+1,c);pixel(x+k*2+1,y+r*2+1,c);}x+=12;}}
 static void clear(Color c){rect(0,0,W,H,c);}
 static void line(int x0,int y0,int x1,int y1,Color c){int dx=x1>x0?x1-x0:x0-x1,sx=x0<x1?1:-1,dy=-(y1>y0?y1-y0:y0-y1),sy=y0<y1?1:-1,err=dx+dy,e;for(;;){pixel(x0,y0,c);if(x0==x1&&y0==y1)break;e=2*err;if(e>=dy){err+=dy;x0+=sx;}if(e<=dx){err+=dx;y0+=sy;}}}
-static void sound_init(void){REG_SOUNDCNT_X=0x0080;REG_SOUNDCNT_L=0x1177;REG_SND2CNT=0x00F2;}
+static void sound_init(void){REG_SOUNDCNT_X=0x0080;REG_SOUNDCNT_L=0x1177;REG_SND2CNT=0xF2C0;}
 static const uint16_t song[]={1547,1462,1371,1216,1371,1462,1547,1784,1547,1462,1216,1371,1462,1547,1462,1784};
 static unsigned song_frame=0,song_step=0;
 static void music_tick(void){song_frame++;if(song_frame>=30){song_frame=0;REG_SND2FREQ=(uint16_t)(0x8000|song[song_step]);song_step=(song_step+1)%16;}}
-static void logo(void){clear(BLACK);rect(114,49,5,5,GOLD);rect(119,44,5,5,GOLD);rect(124,49,5,5,GOLD);rect(119,54,5,5,GOLD);text(60,70,"MOONLIT PIXEL",MOON);text(84,88,"PRESENTS",GREY);}
+static void logo(void){clear(BLACK);rect(114,49,5,5,GOLD);rect(119,44,5,5,GOLD);rect(124,49,5,5,GOLD);rect(119,54,5,5,GOLD);text(42,70,"MOONLIT PIXEL",MOON);text(72,88,"PRESENTS",GREY);}
 static void landscape(void){
  int x,y;
  clear(SKY);
@@ -75,8 +75,8 @@ int main(void){
  int state=0,hp=34,dr=46,pot=3,choice=0,guard=0,boot;uint16_t old=0;
  REG_DISPCNT=0x0403;sound_init();clear(BLACK);
  for(boot=0;boot<35;boot++)wait_vblank();
- logo();for(boot=0;boot<105;boot++)wait_vblank();
- title();
+ logo();for(boot=0;boot<180;boot++){wait_vblank();if(keys()!=0)break;}
+ title();old=keys();
  for(;;){uint16_t now,pressed;wait_vblank();now=keys();pressed=(uint16_t)(now&(uint16_t)~old);old=now;
  if(state==0){music_tick();if(pressed&(KEY_A|KEY_START)){state=1;hp=34;dr=46;pot=3;choice=0;guard=0;battle(hp,dr,pot,choice);}}
  else if(state==1){if(pressed&KEY_B){state=0;title();}
