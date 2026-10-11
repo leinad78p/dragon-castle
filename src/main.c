@@ -171,9 +171,10 @@ int main(void){
   else if(dialogue_page<0){dialogue_page=0;forest_scene(scene_frame,dialogue_page);}
   else if(pressed&KEY_A){
    if(dialogue_page<5){dialogue_page++;forest_scene(scene_frame,dialogue_page);}
-   else{state=1;hp=34;dr=46;pot=3;choice=0;guard=0;message("DANGER!","SOMETHING MOVES","IN THE FOREST");}
+   else{state=5;hp=34;dr=46;pot=3;choice=0;guard=0;message("DANGER!","SOMETHING MOVES","IN THE FOREST");}
   }
  }
+ else if(state==5){if(pressed&KEY_A){state=1;battle(hp,dr,pot,choice);}}
  else if(state==1){if(pressed&KEY_B){state=0;title();}
  else if(pressed&KEY_UP){choice=(choice+2)%3;battle(hp,dr,pot,choice);}
  else if(pressed&KEY_DOWN){choice=(choice+1)%3;battle(hp,dr,pot,choice);}
