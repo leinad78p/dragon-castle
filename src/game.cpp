@@ -724,10 +724,18 @@ static void use_ability(int hi, int ai) {
 
 static void take_player_turn(int hi) {
     int selected = 0;
+    int rendered_selected = -1;
     for (;;) {
         uint16_t keys;
         if (party[hi].hp <= 0 || dragon_hp <= 0) return;
-        draw_menu(hi, selected);
+
+        /* Redraw the expensive battle scene only when the selection changes.
+           Polling input must not wait for a full dragon/arena redraw every loop. */
+        if (selected != rendered_selected) {
+            draw_menu(hi, selected);
+            rendered_selected = selected;
+        }
+
         gfx_wait_vblank();
         keys = gfx_poll_keys();
         if (keys & GFX_KEY_UP) selected = (selected + 3) & 3;
@@ -735,11 +743,13 @@ static void take_player_turn(int hi) {
         if (keys & GFX_KEY_B) {
             draw_battle_message("SELECT A SKILL", "UP / DOWN CHANGES THE SKILL.", "A CONFIRMS YOUR CHOICE.", 0);
             wait_confirm();
+            rendered_selected = -1;
         }
         if (keys & (GFX_KEY_A | GFX_KEY_START)) {
             if (party[hi].skills[selected].mp_cost > party[hi].mp) {
                 draw_battle_message("NOT ENOUGH MP!", "CHOOSE A CHEAPER SKILL.", "YOUR TURN HAS NOT BEEN USED.", 0);
                 wait_confirm();
+                rendered_selected = -1;
             } else {
                 use_ability(hi, selected);
                 return;
