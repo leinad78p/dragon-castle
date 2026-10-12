@@ -44,29 +44,140 @@ static void small_text(int x,int y,const char*s,Color c){
  while(*s){const Glyph*g=glyph(*s++);int r,k;for(r=0;r<7;r++)for(k=0;k<5;k++)if(g->row[r]&(1u<<(4-k)))pixel(x+k,y+r,c);x+=6;}
 }
 static void line(int x0,int y0,int x1,int y1,Color c){int dx=x1>x0?x1-x0:x0-x1,sx=x0<x1?1:-1,dy=-(y1>y0?y1-y0:y0-y1),sy=y0<y1?1:-1,err=dx+dy,e;for(;;){pixel(x0,y0,c);if(x0==x1&&y0==y1)break;e=2*err;if(e>=dy){err+=dy;x0+=sx;}if(e<=dx){err+=dx;y0+=sy;}}}
+
+/* Small software-raster primitives for detailed static pixel art. */
+#define RGB15(r,g,b) ((Color)((r)|((g)<<5)|((b)<<10)))
+static void hline(int x0,int x1,int y,Color c){
+ int x,t;if(x0>x1){t=x0;x0=x1;x1=t;}for(x=x0;x<=x1;x++)pixel(x,y,c);
+}
+static int edge_intersection_x(int x0,int y0,int x1,int y1,int y){
+ if(y0==y1)return x0;
+ return x0+(y-y0)*(x1-x0)/(y1-y0);
+}
+static void fill_triangle(int x0,int y0,int x1,int y1,int x2,int y2,Color c){
+ int y,miny=y0,maxy=y0,xs[3],n,t,i;
+ if(y1<miny)miny=y1;if(y2<miny)miny=y2;
+ if(y1>maxy)maxy=y1;if(y2>maxy)maxy=y2;
+ for(y=miny;y<=maxy;y++){
+  n=0;
+  if(y>=((y0<y1)?y0:y1)&&y<=((y0>y1)?y0:y1))xs[n++]=edge_intersection_x(x0,y0,x1,y1,y);
+  if(y>=((y1<y2)?y1:y2)&&y<=((y1>y2)?y1:y2))xs[n++]=edge_intersection_x(x1,y1,x2,y2,y);
+  if(y>=((y2<y0)?y2:y0)&&y<=((y2>y0)?y2:y0))xs[n++]=edge_intersection_x(x2,y2,x0,y0,y);
+  for(i=1;i<n;i++){t=xs[i];int j=i-1;while(j>=0&&xs[j]>t){xs[j+1]=xs[j];j--;}xs[j+1]=t;}
+  if(n>=2)hline(xs[0],xs[n-1],y,c);
+ }
+}
+static void fill_oval(int cx,int cy,int rx,int ry,Color c){
+ int x,y,xx,yy,limit;
+ if(rx<1||ry<1)return;
+ limit=rx*rx*ry*ry;
+ for(y=-ry;y<=ry;y++)for(x=-rx;x<=rx;x++){
+  xx=x*x*ry*ry;yy=y*y*rx*rx;
+  if(xx+yy<=limit)pixel(cx+x,cy+y,c);
+ }
+}
+static void dragon_figure(void){
+ Color ink=RGB15(3,2,7),wing=RGB15(15,3,9),winglight=RGB15(22,5,10);
+ Color scale=RGB15(20,7,9),belly=RGB15(24,13,8),gold=RGB15(31,22,7);
+ /* Wings are layered triangles, with visible ribs instead of one flat blob. */
+ fill_triangle(124,96,82,54,91,91,ink);
+ fill_triangle(121,95,85,59,92,87,wing);
+ fill_triangle(121,95,92,87,104,80,wing);
+ fill_triangle(121,95,104,80,112,91,winglight);
+ fill_triangle(129,95,166,54,158,91,ink);
+ fill_triangle(130,94,163,59,157,87,wing);
+ fill_triangle(130,94,157,87,145,80,wing);
+ fill_triangle(130,94,145,80,139,91,winglight);
+ line(123,96,86,57,scale);line(122,96,92,88,scale);line(122,96,105,81,scale);
+ line(130,96,164,57,scale);line(130,96,157,88,scale);line(130,96,145,81,scale);
+ /* Long tail with a small arrow-shaped tip. */
+ line(119,103,110,108,ink);line(110,108,100,108,ink);line(100,108,88,101,ink);
+ line(119,102,110,107,scale);line(110,107,100,107,scale);line(100,107,89,101,scale);
+ fill_triangle(89,101,78,96,86,105,wing);
+ /* Back, belly and neck. */
+ fill_oval(126,101,13,9,ink);
+ fill_oval(126,100,11,7,scale);
+ fill_triangle(128,103,139,87,148,91,ink);
+ fill_triangle(130,103,139,90,143,94,belly);
+ line(133,106,137,111,ink);line(137,111,145,112,ink);
+ line(121,106,119,112,ink);line(119,112,112,114,ink);
+ line(145,112,149,110,ink);line(145,112,150,113,ink);
+ line(112,114,108,112,ink);line(112,114,109,115,ink);
+ /* Head and long snout, facing right. */
+ fill_oval(145,86,7,5,ink);
+ fill_oval(145,85,5,3,scale);
+ fill_triangle(148,84,163,88,149,91,ink);
+ line(149,88,160,88,belly);
+ pixel(148,84,gold);pixel(149,84,gold);
+ /* Horns, dorsal spines and claws catch the moonlight. */
+ line(141,82,137,76,gold);line(143,82,141,75,belly);
+ line(147,82,151,76,gold);line(148,83,153,79,belly);
+ fill_triangle(133,94,135,87,139,93,winglight);
+ fill_triangle(138,91,142,84,144,90,winglight);
+ fill_triangle(128,94,129,88,133,93,winglight);
+ line(122,110,117,115,gold);line(117,115,113,115,gold);
+ line(134,109,138,114,gold);line(138,114,143,114,gold);
+ /* A few bright scales define the shoulder and cheek. */
+ pixel(132,99,belly);pixel(135,97,belly);pixel(138,94,belly);
+ pixel(153,86,gold);pixel(155,87,belly);
+}
+
 static void sound_init(void){REG_SOUNDCNT_X=0x0080;REG_SOUNDCNT_L=0x1177;REG_SND2CNT=0xF2C0;}
 static const uint16_t song[]={1547,1462,1371,1216,1371,1462,1547,1784,1547,1462,1216,1371,1462,1547,1462,1784};
 static unsigned song_frame=0,song_step=0;
 static void music_tick(void){song_frame++;if(song_frame>=30){song_frame=0;REG_SND2FREQ=(uint16_t)(0x8000|song[song_step]);song_step=(song_step+1)%16;}}
 static void logo(void){clear(BLACK);rect(114,49,5,5,GOLD);rect(119,44,5,5,GOLD);rect(124,49,5,5,GOLD);rect(119,54,5,5,GOLD);text(42,70,"MOONLIT PIXEL",MOON);text(72,88,"PRESENTS",GREY);}
 static void landscape(void){
- int x,y;
- clear(SKY);
- rect(24,20,2,2,WHITE);rect(53,39,2,2,WHITE);rect(107,16,2,2,WHITE);rect(207,32,2,2,WHITE);rect(179,16,15,15,MOON);rect(185,12,13,13,SKY);
- for(x=0;x<W;x++){int ridge=111-(x<95?(95-x)/8:(x-95)/13);for(y=ridge;y<H;y++)pixel(x,y,HILL);}
- for(x=0;x<W;x++){int ridge=132-(x<140?(140-x)/12:(x-140)/7);for(y=ridge;y<H;y++)pixel(x,y,GRASS);}
- /* Castle silhouette */
- rect(137,73,53,42,BLACK);rect(131,64,14,51,BLACK);rect(149,56,13,59,BLACK);rect(176,62,18,53,BLACK);rect(193,75,8,40,BLACK);
- rect(133,59,3,5,BLACK);rect(139,59,3,5,BLACK);rect(151,50,3,6,BLACK);rect(157,50,3,6,BLACK);rect(179,56,4,6,BLACK);rect(187,56,4,6,BLACK);
- rect(145,83,5,8,MOON);rect(160,83,5,8,MOON);rect(179,82,5,8,MOON);rect(158,99,12,16,WOOD);
- /* Tree */
- line(40,91,40,137,WOOD);rect(36,104,5,26,WOOD);rect(41,113,5,19,WOOD);
- line(40,49,18,94,BLACK);line(40,49,62,94,BLACK);line(18,94,62,94,BLACK);line(40,62,21,105,BLACK);line(40,62,59,105,BLACK);line(21,105,59,105,BLACK);line(40,74,25,115,BLACK);line(40,74,55,115,BLACK);line(25,115,55,115,BLACK);
- rect(31,81,5,5,LEAF);rect(44,73,5,5,LEAF);rect(25,94,5,5,LEAF);rect(49,96,5,5,LEAF);
- /* Sword resting against the trunk */
- line(69,132,91,105,WHITE);line(70,133,92,106,MOON);line(66,128,75,136,GOLD);line(85,100,98,113,GOLD);line(88,97,101,110,WOOD);
- rect(8,7,112,29,BLACK);text(14,12,"DRAGON CASTLE",GOLD);
- rect(7,141,226,15,BLACK);text(16,145,"A START",WHITE);text(108,145,"B ADVENTURE",MOON);
+ Color night=RGB15(2,3,11),far=RGB15(4,6,15),far2=RGB15(6,8,19);
+ Color mountain=RGB15(7,9,17),leftface=RGB15(8,11,21),rightface=RGB15(4,5,13);
+ Color snow=RGB15(20,22,25),snowlight=RGB15(29,29,31),mist=RGB15(9,12,22);
+ int i;
+ clear(night);
+ /* Moonlit sky: stars, a crescent moon, and thin bands of cloud. */
+ fill_oval(195,43,12,12,RGB15(25,25,27));
+ fill_oval(201,39,11,11,night);
+ pixel(23,48,WHITE);pixel(44,65,RGB15(18,21,29));pixel(70,43,WHITE);
+ pixel(153,44,RGB15(18,21,29));pixel(173,58,WHITE);pixel(221,48,WHITE);
+ pixel(34,83,RGB15(15,18,27));pixel(211,78,RGB15(15,18,27));
+ line(13,54,37,54,mist);line(18,58,31,58,mist);
+ line(166,66,190,66,mist);line(178,70,198,70,mist);
+ /* Distant mountain range. */
+ fill_triangle(0,119,34,75,77,119,far);
+ fill_triangle(34,120,84,81,132,120,far2);
+ fill_triangle(104,121,169,64,239,121,far);
+ fill_triangle(0,127,58,95,102,127,RGB15(5,7,16));
+ fill_triangle(157,126,207,87,239,125,RGB15(5,7,16));
+ fill_triangle(24,91,34,75,47,91,RGB15(16,18,25));
+ fill_triangle(73,91,84,81,94,91,RGB15(16,18,25));
+ fill_triangle(151,81,169,64,185,82,RGB15(17,19,26));
+ /* The central mountain has two shaded faces and a snowy summit. */
+ fill_triangle(10,141,116,53,222,141,mountain);
+ fill_triangle(10,141,116,53,116,141,leftface);
+ fill_triangle(116,141,116,53,222,141,rightface);
+ fill_triangle(99,77,116,53,134,78,snow);
+ fill_triangle(108,70,116,53,122,72,snowlight);
+ fill_triangle(99,77,108,70,111,79,RGB15(15,18,25));
+ fill_triangle(122,72,134,78,127,81,RGB15(13,16,23));
+ line(12,140,116,54,RGB15(12,15,23));
+ line(116,54,221,140,RGB15(10,12,19));
+ /* Rock shelf: the dragon is perched above the valley. */
+ fill_triangle(54,132,112,113,179,137,RGB15(3,4,10));
+ fill_triangle(83,132,112,113,142,132,RGB15(8,10,17));
+ fill_triangle(112,113,179,137,142,132,RGB15(5,7,13));
+ line(65,132,112,116,RGB15(13,15,21));
+ line(112,116,151,132,RGB15(10,12,18));
+ /* A little drifting mist separates the mountain layers. */
+ for(i=0;i<3;i++){
+  line(8+i*9,119+i*3,49+i*9,119+i*3,RGB15(7,9,17));
+  line(178+i*8,112+i*3,226+i*4,112+i*3,RGB15(7,9,17));
+ }
+ /* The dragon itself is drawn from C primitives directly into GBA VRAM. */
+ dragon_figure();
+ /* Keep title text readable over the illustration. */
+ rect(6,6,169,29,BLACK);
+ text(12,12,"DRAGON CASTLE",GOLD);
+ rect(7,141,226,15,BLACK);
+ text(16,145,"A START",WHITE);text(108,145,"B ADVENTURE",MOON);
 }
 static void title(void){landscape();}
 static void wait_vblank(void){while(REG_DISPSTAT&1){}while(!(REG_DISPSTAT&1)){}}
