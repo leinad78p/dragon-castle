@@ -4,6 +4,7 @@
  */
 #include <stdint.h>
 #include "sound.h"
+#include "piano.h"
 
 #define REG_SOUNDCNT_L (*(volatile uint16_t *)0x04000080)
 #define REG_SOUNDCNT_X (*(volatile uint16_t *)0x04000084)
@@ -43,6 +44,12 @@ static unsigned note_count = 0;
 static const Note *active_song = 0;
 
 static void play_note(uint16_t frequency) {
+    if (active_track == 0) {
+        REG_SND2CNT = 0;
+        piano_note_on(frequency);
+        return;
+    }
+    piano_note_off();
     if (frequency == 0) {
         REG_SND2CNT = 0;
         return;
@@ -53,8 +60,9 @@ static void play_note(uint16_t frequency) {
 
 void music_init(void) {
     REG_SOUNDCNT_X = 0x0080; /* Enable sound hardware. */
-    REG_SOUNDCNT_L = 0x2277; /* Max volume; route PSG channel 2 to left and right. */
+    REG_SOUNDCNT_L = 0x6677; /* Route PSG channels 2 and 3 to both speakers. */
     REG_SND2CNT = 0;
+    piano_init();
     active_track = -1;
     note_index = 0;
     frame_counter = 0;
@@ -82,6 +90,8 @@ void music_update(void) {
     if (!active_song || note_count == 0) return;
 
     ++frame_counter;
+    if (active_track == 0 && active_song[note_index].frequency != 0)
+        piano_update(frame_counter);
     if (frame_counter < (unsigned)active_song[note_index].frames) return;
     frame_counter = 0;
     note_index = (note_index + 1u) % note_count;
