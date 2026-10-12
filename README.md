@@ -3,7 +3,7 @@
 A fresh playable prototype for Game Boy Advance. The code is deliberately split by responsibility:
 
 - `src/gfx.c` and `src/gfx.h`: Mode 4 double-buffered graphics, pixel-art drawing primitives, 5×7 font, VBlank and edge-triggered button input (C).
-- `src/sound.c` and `src/sound.h`: original castle and battle chiptune melodies using the GBA's built-in square-wave sound hardware.
+- `src/sound.c` and `src/sound.h`: castle and battle music sequencer; `src/piano.c` and `src/piano.h`: a custom-wave, piano-like instrument on PSG channel 3.
 - `src/game.cpp`: cinematic, original character/dragon shapes, party statistics, all 16 skills, combat UI, damage, healing, shields, buffs, stun and turn order (C++).
 - `SKILLS.md`: each protagonist's base stats and all skill power, MP cost, accuracy and effects.
 - `Makefile`: builds both languages with devkitARM.
@@ -11,7 +11,11 @@ A fresh playable prototype for Game Boy Advance. The code is deliberately split 
 
 ## The opening cinematic
 
-The four protagonists walk through the outer gate, cross the torch-lit corridor, and confront the dragon in the throne chamber. The dialogue is advanced with **A** or **START**. An original, looping castle theme plays during the opening; a faster original battle theme starts when combat begins.
+The four protagonists walk through the outer gate, cross the torch-lit corridor, and confront the dragon in the throne chamber. The dialogue is advanced with **A** or **START**. An original, looping castle theme uses a short plucked, piano-like custom waveform on sound channel 3; a faster square-wave battle theme starts when combat begins.
+
+## Sound engine
+
+The opening theme uses a 32-sample, 4-bit custom waveform on the GBA wave channel, with a small software volume envelope to imitate a struck keyboard note. This is a lightweight synthesized piano-like timbre, not a recording of a real piano. The battle theme continues to use the square-wave channel.
 
 ## Party and skills
 
