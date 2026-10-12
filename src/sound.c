@@ -1,12 +1,13 @@
 /*
  * Dragon Castle - lightweight original chiptune music for Game Boy Advance.
- * Uses the built-in PSG square-wave channel; no samples or external libraries.
+ * Uses the built-in PSG channels; no samples or external libraries.
  */
 #include <stdint.h>
 #include "sound.h"
 #include "piano.h"
 
 #define REG_SOUNDCNT_L (*(volatile uint16_t *)0x04000080)
+#define REG_SOUNDCNT_H (*(volatile uint16_t *)0x04000082)
 #define REG_SOUNDCNT_X (*(volatile uint16_t *)0x04000084)
 #define REG_SND2CNT    (*(volatile uint16_t *)0x04000068)
 #define REG_SND2FREQ   (*(volatile uint16_t *)0x0400006C)
@@ -59,13 +60,19 @@ static void play_note(uint16_t frequency) {
 }
 
 void music_init(void) {
-    REG_SOUNDCNT_X = 0x0080; /* Enable sound hardware. */
-    REG_SOUNDCNT_L = 0x6677; /* Route PSG channels 2 and 3 to both speakers. */
+    /* Enable sound first; register writes before this can be ignored. */
+    REG_SOUNDCNT_X = 0x0080u;
+    /* Route PSG channels 2 and 3 to both speakers. */
+    REG_SOUNDCNT_L = 0x6677u;
+    /* PSG volume ratio: 100%; preserve Direct Sound control bits. */
+    REG_SOUNDCNT_H = (uint16_t)((REG_SOUNDCNT_H & (uint16_t)~0x0003u) | 0x0002u);
     REG_SND2CNT = 0;
     piano_init();
     active_track = -1;
     note_index = 0;
     frame_counter = 0;
+    note_count = 0;
+    active_song = 0;
 }
 
 void music_set_track(int track) {
@@ -85,7 +92,7 @@ void music_set_track(int track) {
     play_note(active_song[0].frequency);
 }
 
-/* Called once per video frame from gfx_wait_vblank (about 60 times/second). */
+/* Called once per video frame from the main loop (about 60 times/second). */
 void music_update(void) {
     if (!active_song || note_count == 0) return;
 
