@@ -53,7 +53,7 @@ static void play_note(uint16_t frequency) {
 
 void music_init(void) {
     REG_SOUNDCNT_X = 0x0080; /* Enable sound hardware. */
-    REG_SOUNDCNT_L = 0x1177; /* Route PSG channels to both speakers. */
+    REG_SOUNDCNT_L = 0x2277; /* Max volume; route PSG channel 2 to left and right. */
     REG_SND2CNT = 0;
     active_track = -1;
     note_index = 0;
