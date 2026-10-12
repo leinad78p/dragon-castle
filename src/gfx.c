@@ -184,8 +184,9 @@ void gfx_line(int x0, int y0, int x1, int y1, GfxColor color) {
     int dy = -(y1 > y0 ? y1 - y0 : y0 - y1);
     int sy = y0 < y1 ? 1 : -1;
     int err = dx + dy;
+    unsigned index = color_index(color);
     for (;;) {
-        gfx_pixel(x0, y0, color);
+        put_pixel_index(x0, y0, index);
         if (x0 == x1 && y0 == y1) break;
         {
             int twice = 2 * err;
@@ -225,12 +226,14 @@ void gfx_triangle(int x0, int y0, int x1, int y1, int x2, int y2, GfxColor color
 void gfx_ellipse(int cx, int cy, int rx, int ry, GfxColor color) {
     int x, y;
     int limit;
+    unsigned index;
     if (rx < 1 || ry < 1) return;
+    index = color_index(color);
     limit = rx * rx * ry * ry;
     for (y = -ry; y <= ry; ++y)
         for (x = -rx; x <= rx; ++x)
             if (x * x * ry * ry + y * y * rx * rx <= limit)
-                gfx_pixel(cx + x, cy + y, color);
+                put_pixel_index(cx + x, cy + y, index);
 }
 
 static const Glyph *find_glyph(char ch) {
