@@ -12,27 +12,37 @@
 
 static volatile uint8_t *draw_page = VRAM_PAGE1;
 static uint16_t palette_colors[256];
+/* Direct RGB555 lookup avoids a 256-color scan for every drawn pixel. */
+static uint8_t color_cache[32768];
 static unsigned palette_count = 0;
 static int frame_dirty = 0;
 
 static unsigned color_index(GfxColor color) {
     unsigned i;
+    unsigned key = (unsigned)color & 0x7FFFu;
+    unsigned cached = color_cache[key];
+    if (cached != 0xFFu) return cached;
+
     for (i = 0; i < palette_count; ++i) {
-        if (palette_colors[i] == color) return i;
+        if (palette_colors[i] == key) {
+            color_cache[key] = (uint8_t)i;
+            return i;
+        }
     }
 
     if (palette_count < 256) {
         unsigned index = palette_count++;
-        palette_colors[index] = color;
-        REG_BG_PALETTE[index] = color;
+        palette_colors[index] = (uint16_t)key;
+        REG_BG_PALETTE[index] = (uint16_t)key;
+        color_cache[key] = (uint8_t)index;
         return index;
     }
 
-    /* If the palette fills up, use the closest existing RGB555 color. */
+    /* Cache nearest-color fallback too, so this search happens only once per RGB555 color. */
     {
         unsigned best = 0;
         unsigned best_distance = 0xFFFFFFFFu;
-        int r = color & 31, g = (color >> 5) & 31, b = (color >> 10) & 31;
+        int r = key & 31, g = (key >> 5) & 31, b = (key >> 10) & 31;
         for (i = 0; i < 256; ++i) {
             int dr = r - (palette_colors[i] & 31);
             int dg = g - ((palette_colors[i] >> 5) & 31);
@@ -43,10 +53,10 @@ static unsigned color_index(GfxColor color) {
                 best = i;
             }
         }
+        color_cache[key] = (uint8_t)best;
         return best;
     }
 }
-
 static void put_pixel_index(int x, int y, unsigned index) {
     if ((unsigned)x < SCREEN_W && (unsigned)y < SCREEN_H) {
         draw_page[y * SCREEN_W + x] = (uint8_t)index;
@@ -95,6 +105,7 @@ void gfx_init(void) {
     draw_page = VRAM_PAGE1;
     palette_count = 0;
     frame_dirty = 0;
+    for (i = 0; i < 32768; ++i) color_cache[i] = 0xFFu;
     for (i = 0; i < 256; ++i) {
         palette_colors[i] = 0;
         REG_BG_PALETTE[i] = 0;
