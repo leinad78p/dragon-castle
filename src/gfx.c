@@ -6,7 +6,53 @@
 #define REG_DISPCNT (*(volatile uint16_t *)0x04000000)
 #define REG_DISPSTAT (*(volatile uint16_t *)0x04000004)
 #define REG_KEYINPUT (*(volatile uint16_t *)0x04000130)
-#define VRAM ((volatile uint16_t *)0x06000000)
+#define REG_BG_PALETTE ((volatile uint16_t *)0x05000000)
+#define VRAM_PAGE0 ((volatile uint8_t *)0x06000000)
+#define VRAM_PAGE1 ((volatile uint8_t *)0x0600A000)
+
+static volatile uint8_t *draw_page = VRAM_PAGE1;
+static uint16_t palette_colors[256];
+static unsigned palette_count = 0;
+static int frame_dirty = 0;
+
+static unsigned color_index(GfxColor color) {
+    unsigned i;
+    for (i = 0; i < palette_count; ++i) {
+        if (palette_colors[i] == color) return i;
+    }
+
+    if (palette_count < 256) {
+        unsigned index = palette_count++;
+        palette_colors[index] = color;
+        REG_BG_PALETTE[index] = color;
+        return index;
+    }
+
+    /* If the palette fills up, use the closest existing RGB555 color. */
+    {
+        unsigned best = 0;
+        unsigned best_distance = 0xFFFFFFFFu;
+        int r = color & 31, g = (color >> 5) & 31, b = (color >> 10) & 31;
+        for (i = 0; i < 256; ++i) {
+            int dr = r - (palette_colors[i] & 31);
+            int dg = g - ((palette_colors[i] >> 5) & 31);
+            int db = b - ((palette_colors[i] >> 10) & 31);
+            unsigned distance = (unsigned)(dr * dr + dg * dg + db * db);
+            if (distance < best_distance) {
+                best_distance = distance;
+                best = i;
+            }
+        }
+        return best;
+    }
+}
+
+static void put_pixel_index(int x, int y, unsigned index) {
+    if ((unsigned)x < SCREEN_W && (unsigned)y < SCREEN_H) {
+        draw_page[y * SCREEN_W + x] = (uint8_t)index;
+        frame_dirty = 1;
+    }
+}
 
 /* Each glyph contains seven rows of five pixels. */
 typedef struct { char ch; uint8_t rows[7]; } Glyph;
@@ -44,7 +90,15 @@ static const Glyph FONT[] = {
 static uint16_t previous_keys = 0;
 
 void gfx_init(void) {
-    REG_DISPCNT = 0x0403; /* Mode 3 + BG2; 240x160, 15-bit color. */
+    unsigned i;
+    REG_DISPCNT = 0x0404; /* Mode 4 + BG2; 240x160, indexed color, page 0 visible. */
+    draw_page = VRAM_PAGE1;
+    palette_count = 0;
+    frame_dirty = 0;
+    for (i = 0; i < 256; ++i) {
+        palette_colors[i] = 0;
+        REG_BG_PALETTE[i] = 0;
+    }
     previous_keys = (uint16_t)((~REG_KEYINPUT) & 0x03FFu);
     gfx_clear(GFX_RGB(1, 2, 8));
 }
@@ -52,6 +106,18 @@ void gfx_init(void) {
 void gfx_wait_vblank(void) {
     while (REG_DISPSTAT & 1u) { }
     while (!(REG_DISPSTAT & 1u)) { }
+
+    /* Flip only after a complete frame has been drawn to the hidden page. */
+    if (frame_dirty) {
+        if (draw_page == VRAM_PAGE1) {
+            REG_DISPCNT |= 0x0010u;  /* Display page 1. */
+            draw_page = VRAM_PAGE0;
+        } else {
+            REG_DISPCNT &= (uint16_t)~0x0010u; /* Display page 0. */
+            draw_page = VRAM_PAGE1;
+        }
+        frame_dirty = 0;
+    }
 }
 
 void gfx_wait_frames(unsigned frames) {
@@ -69,26 +135,31 @@ uint16_t gfx_poll_keys(void) {
 }
 
 void gfx_pixel(int x, int y, GfxColor color) {
-    if ((unsigned)x < SCREEN_W && (unsigned)y < SCREEN_H)
-        VRAM[y * SCREEN_W + x] = color;
+    put_pixel_index(x, y, color_index(color));
 }
 
 void gfx_clear(GfxColor color) {
     int i;
-    for (i = 0; i < SCREEN_W * SCREEN_H; ++i) VRAM[i] = color;
+    unsigned index = color_index(color);
+    for (i = 0; i < SCREEN_W * SCREEN_H; ++i) draw_page[i] = (uint8_t)index;
+    frame_dirty = 1;
 }
 
 void gfx_rect(int x, int y, int width, int height, GfxColor color) {
     int xx, yy;
+    unsigned index = color_index(color);
     int x_end = x + width;
     int y_end = y + height;
     if (x < 0) x = 0;
     if (y < 0) y = 0;
     if (x_end > SCREEN_W) x_end = SCREEN_W;
     if (y_end > SCREEN_H) y_end = SCREEN_H;
-    for (yy = y; yy < y_end; ++yy)
-        for (xx = x; xx < x_end; ++xx)
-            VRAM[yy * SCREEN_W + xx] = color;
+    if (x >= x_end || y >= y_end) return;
+    for (yy = y; yy < y_end; ++yy) {
+        volatile uint8_t *row = draw_page + yy * SCREEN_W;
+        for (xx = x; xx < x_end; ++xx) row[xx] = (uint8_t)index;
+    }
+    frame_dirty = 1;
 }
 
 void gfx_line(int x0, int y0, int x1, int y1, GfxColor color) {
@@ -155,13 +226,14 @@ static const Glyph *find_glyph(char ch) {
 }
 
 void gfx_text(int x, int y, const char *text, GfxColor color) {
+    unsigned index = color_index(color);
     while (*text) {
         const Glyph *g = find_glyph(*text++);
         int row, col;
         for (row = 0; row < 7; ++row)
             for (col = 0; col < 5; ++col)
                 if (g->rows[row] & (uint8_t)(1u << (4 - col)))
-                    gfx_pixel(x + col, y + row, color);
+                    put_pixel_index(x + col, y + row, index);
         x += 6;
     }
 }
