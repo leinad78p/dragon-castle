@@ -12,20 +12,23 @@
 
 static volatile uint8_t *draw_page = VRAM_PAGE1;
 static uint16_t palette_colors[256];
-/* Direct RGB555 lookup avoids a 256-color scan for every drawn pixel. */
-static uint8_t color_cache[32768];
+/* Small direct-mapped cache: the GBA only has 32 KB of IWRAM. */
+#define COLOR_CACHE_SIZE 1024u
+static uint16_t color_cache_keys[COLOR_CACHE_SIZE];
+static uint8_t color_cache_values[COLOR_CACHE_SIZE];
 static unsigned palette_count = 0;
 static int frame_dirty = 0;
 
 static unsigned color_index(GfxColor color) {
     unsigned i;
     unsigned key = (unsigned)color & 0x7FFFu;
-    unsigned cached = color_cache[key];
-    if (cached != 0xFFu) return cached;
+    unsigned slot = (key * 2654435761u) >> 22;
+    if (color_cache_keys[slot] == key) return color_cache_values[slot];
 
     for (i = 0; i < palette_count; ++i) {
         if (palette_colors[i] == key) {
-            color_cache[key] = (uint8_t)i;
+            color_cache_keys[slot] = (uint16_t)key;
+            color_cache_values[slot] = (uint8_t)i;
             return i;
         }
     }
@@ -34,11 +37,12 @@ static unsigned color_index(GfxColor color) {
         unsigned index = palette_count++;
         palette_colors[index] = (uint16_t)key;
         REG_BG_PALETTE[index] = (uint16_t)key;
-        color_cache[key] = (uint8_t)index;
+        color_cache_keys[slot] = (uint16_t)key;
+        color_cache_values[slot] = (uint8_t)index;
         return index;
     }
 
-    /* Cache nearest-color fallback too, so this search happens only once per RGB555 color. */
+    /* Remember the nearest palette match too, for frequently used colors. */
     {
         unsigned best = 0;
         unsigned best_distance = 0xFFFFFFFFu;
@@ -53,7 +57,8 @@ static unsigned color_index(GfxColor color) {
                 best = i;
             }
         }
-        color_cache[key] = (uint8_t)best;
+        color_cache_keys[slot] = (uint16_t)key;
+        color_cache_values[slot] = (uint8_t)best;
         return best;
     }
 }
@@ -105,7 +110,7 @@ void gfx_init(void) {
     draw_page = VRAM_PAGE1;
     palette_count = 0;
     frame_dirty = 0;
-    for (i = 0; i < 32768; ++i) color_cache[i] = 0xFFu;
+    for (i = 0; i < COLOR_CACHE_SIZE; ++i) color_cache_keys[i] = 0xFFFFu;
     for (i = 0; i < 256; ++i) {
         palette_colors[i] = 0;
         REG_BG_PALETTE[i] = 0;
