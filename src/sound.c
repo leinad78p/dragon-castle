@@ -40,7 +40,6 @@ static int active_track = -1;
 static unsigned note_index = 0;
 static unsigned frame_counter = 0;
 static unsigned note_count = 0;
-static unsigned tempo_frames = 18;
 static const Note *active_song = 0;
 
 static void play_note(uint16_t frequency) {
@@ -71,11 +70,9 @@ void music_set_track(int track) {
     if (track == 1) {
         active_song = battle_song;
         note_count = sizeof(battle_song) / sizeof(battle_song[0]);
-        tempo_frames = 12;
     } else {
         active_song = castle_song;
         note_count = sizeof(castle_song) / sizeof(castle_song[0]);
-        tempo_frames = 18;
     }
     play_note(active_song[0].frequency);
 }
