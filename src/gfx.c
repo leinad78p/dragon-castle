@@ -1,5 +1,6 @@
 /* Dragon Castle - GBA graphics and input layer (C, no libgba dependency). */
 #include "gfx.h"
+#include "sound.h"
 
 #define SCREEN_W 240
 #define SCREEN_H 160
@@ -142,6 +143,7 @@ void gfx_wait_vblank(void) {
         }
         frame_dirty = 0;
     }
+    music_update();
 }
 
 void gfx_wait_frames(unsigned frames) {
