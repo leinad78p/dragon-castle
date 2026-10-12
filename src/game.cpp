@@ -4,6 +4,7 @@
  * Freestanding-friendly: no STL, heap allocation, exceptions, RTTI or libgba.
  */
 #include "gfx.h"
+#include "sound.h"
 
 #define SCREEN_W 240
 #define SCREEN_H 160
@@ -381,6 +382,7 @@ static void walk_group(int scene, int first_start, int first_end, int frames) {
 }
 
 static void run_cinematic(void) {
+    music_set_track(0);
     title_card();
 
     /* The four enter through the outer gate. */
@@ -827,6 +829,7 @@ static void defeat_screen(void) {
 
 static int run_battle(void) {
     int round_alive;
+    music_set_track(1);
     setup_party();
     show_action("THE BATTLE BEGINS!", "FOUR ALLIES, FOUR TURNS.", "THEN THE DRAGON WILL STRIKE.", 0);
 
@@ -850,6 +853,8 @@ static int run_battle(void) {
 
 extern "C" int main(void) {
     gfx_init();
+    music_init();
+    music_set_track(0);
     for (;;) {
         run_cinematic();
         (void)run_battle();
