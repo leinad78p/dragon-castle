@@ -139,9 +139,17 @@ static void dialogue_box(int page){
  if(line2[0])small_text(12,136,line2,WHITE);
  small_text(174,146,"A: SIGUIENTE",MOON);
 }
-static void forest_scene(int frame,int page){
- int base,look=0;
+static Color scene_backup[90*34];
+static void forest_scene_init(void){
+ int x,y;
  forest_background();
+ /* Keep a clean copy of the small area where the party walks. */
+ for(y=68;y<102;y++)for(x=0;x<90;x++)scene_backup[(y-68)*90+x]=VRAM[y*W+x];
+}
+static void forest_scene(int frame,int page){
+ int base,look=0,x,y;
+ /* Restore only the characters' area; the forest itself is static. */
+ for(y=68;y<102;y++)for(x=0;x<90;x++)pixel(x,y,scene_backup[(y-68)*90+x]);
  /* The party enters from the left, then stops to look around. */
  base=frame<105 ? -25+frame/3 : 10;
  if(frame>=105)look=((frame/24)%2==0)?-1:1;
@@ -150,7 +158,7 @@ static void forest_scene(int frame,int page){
  hero_sprite(base+38,74,2,look);
  hero_sprite(base+57,78,3,-look);
  if(page>=0)dialogue_box(page);
- else{
+ else if(frame==0){
   rect(4,139,232,17,BLACK);
   small_text(13,145,"THE FOREST OF VALDORIA",MOON);
  }
@@ -165,7 +173,7 @@ int main(void){
  logo();for(boot=0;boot<180;boot++){wait_vblank();if(keys()!=0)break;}
  title();old=keys();
  for(;;){uint16_t now,pressed;wait_vblank();now=keys();pressed=(uint16_t)(now&(uint16_t)~old);old=now;
- if(state==0){music_tick();if(pressed&(KEY_A|KEY_START)){state=4;scene_frame=0;dialogue_page=-1;forest_scene(scene_frame,dialogue_page);}}
+ if(state==0){music_tick();if(pressed&(KEY_A|KEY_START)){state=4;scene_frame=0;dialogue_page=-1;forest_scene_init();forest_scene(scene_frame,dialogue_page);}}
  else if(state==4){
   if(scene_frame<150){scene_frame++;forest_scene(scene_frame,-1);}
   else if(dialogue_page<0){dialogue_page=0;forest_scene(scene_frame,dialogue_page);}
