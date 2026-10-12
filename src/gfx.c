@@ -7,10 +7,10 @@
 #define REG_DISPSTAT (*(volatile uint16_t *)0x04000004)
 #define REG_KEYINPUT (*(volatile uint16_t *)0x04000130)
 #define REG_BG_PALETTE ((volatile uint16_t *)0x05000000)
-#define VRAM_PAGE0 ((volatile uint8_t *)0x06000000)
-#define VRAM_PAGE1 ((volatile uint8_t *)0x0600A000)
+#define VRAM_PAGE0 ((volatile uint16_t *)0x06000000)
+#define VRAM_PAGE1 ((volatile uint16_t *)0x0600A000)
 
-static volatile uint8_t *draw_page = VRAM_PAGE1;
+static volatile uint16_t *draw_page = VRAM_PAGE1;
 static uint16_t palette_colors[256];
 /* Small direct-mapped cache: the GBA only has 32 KB of IWRAM. */
 #define COLOR_CACHE_SIZE 1024u
@@ -62,9 +62,17 @@ static unsigned color_index(GfxColor color) {
         return best;
     }
 }
+/* Mode 4 stores two 8-bit palette indices per 16-bit VRAM word.
+   GBA VRAM byte writes are not safe for individual pixels: write halfwords. */
 static void put_pixel_index(int x, int y, unsigned index) {
     if ((unsigned)x < SCREEN_W && (unsigned)y < SCREEN_H) {
-        draw_page[y * SCREEN_W + x] = (uint8_t)index;
+        unsigned pixel = (unsigned)y * SCREEN_W + (unsigned)x;
+        volatile uint16_t *word = draw_page + (pixel >> 1);
+        uint16_t old = *word;
+        if (pixel & 1u)
+            *word = (uint16_t)((old & 0x00FFu) | ((index & 0xFFu) << 8));
+        else
+            *word = (uint16_t)((old & 0xFF00u) | (index & 0xFFu));
         frame_dirty = 1;
     }
 }
@@ -155,9 +163,10 @@ void gfx_pixel(int x, int y, GfxColor color) {
 }
 
 void gfx_clear(GfxColor color) {
-    int i;
+    unsigned i;
     unsigned index = color_index(color);
-    for (i = 0; i < SCREEN_W * SCREEN_H; ++i) draw_page[i] = (uint8_t)index;
+    uint16_t packed = (uint16_t)(index | (index << 8));
+    for (i = 0; i < (SCREEN_W * SCREEN_H) / 2; ++i) draw_page[i] = packed;
     frame_dirty = 1;
 }
 
@@ -172,8 +181,23 @@ void gfx_rect(int x, int y, int width, int height, GfxColor color) {
     if (y_end > SCREEN_H) y_end = SCREEN_H;
     if (x >= x_end || y >= y_end) return;
     for (yy = y; yy < y_end; ++yy) {
-        volatile uint8_t *row = draw_page + yy * SCREEN_W;
-        for (xx = x; xx < x_end; ++xx) row[xx] = (uint8_t)index;
+        volatile uint16_t *row = draw_page + (yy * SCREEN_W) / 2;
+        int left = x;
+        int right = x_end;
+        uint16_t packed = (uint16_t)(index | (index << 8));
+
+        /* Preserve the pixel immediately before an odd starting coordinate. */
+        if (left & 1) {
+            unsigned slot = (unsigned)left >> 1;
+            row[slot] = (uint16_t)((row[slot] & 0x00FFu) | ((index & 0xFFu) << 8));
+            ++left;
+        }
+        /* Fill pairs of pixels with one aligned 16-bit write. */
+        for (xx = left; xx + 1 < right; xx += 2)
+            row[xx >> 1] = packed;
+        /* A final even pixel occupies the low byte of its word. */
+        if (left < right)
+            row[(right - 1) >> 1] = (uint16_t)((row[(right - 1) >> 1] & 0xFF00u) | (index & 0xFFu));
     }
     frame_dirty = 1;
 }
