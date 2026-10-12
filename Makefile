@@ -26,7 +26,7 @@ export PATH := $(DEVKITARM)/bin:$(PATH)
 export DEPSDIR := $(CURDIR)/$(BUILD)
 
 # Deliberately list only the new files: the retired src/main.c stays out of the build.
-CFILES := gfx.c sound.c
+CFILES := gfx.c sound.c piano.c
 CPPFILES := game.cpp
 SFILES :=
 
