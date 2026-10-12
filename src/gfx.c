@@ -248,16 +248,22 @@ void gfx_triangle(int x0, int y0, int x1, int y1, int x2, int y2, GfxColor color
 }
 
 void gfx_ellipse(int cx, int cy, int rx, int ry, GfxColor color) {
-    int x, y;
-    int limit;
-    unsigned index;
+    int y, x, limit;
     if (rx < 1 || ry < 1) return;
-    index = color_index(color);
     limit = rx * rx * ry * ry;
-    for (y = -ry; y <= ry; ++y)
-        for (x = -rx; x <= rx; ++x)
-            if (x * x * ry * ry + y * y * rx * rx <= limit)
-                put_pixel_index(cx + x, cy + y, index);
+
+    /* Draw each filled ellipse row as a horizontal span. The previous
+       per-pixel read/modify/write path was expensive on GBA Mode 4 VRAM. */
+    for (y = -ry; y <= ry; ++y) {
+        int xx;
+        int yy = y * y * rx * rx;
+        int remaining = limit - yy;
+        if (remaining < 0) continue;
+        x = rx;
+        while (x > 0 && x * x * ry * ry > remaining) --x;
+        xx = x;
+        gfx_rect(cx - xx, cy + y, xx * 2 + 1, 1, color);
+    }
 }
 
 static const Glyph *find_glyph(char ch) {
